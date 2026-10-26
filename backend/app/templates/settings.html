@@ -9,7 +9,7 @@
   <label for="n">Nombre</label><input id="n" name="name" required value="{{ prop.name if prop else 'C.M / Yosef Golan' }}">
   <label for="a">Dirección</label><input id="a" name="address" value="{{ prop.address if prop and prop.address }}">
   <div class="row">
-    <div><label for="c">Moneda (ISO)</label><input id="c" name="currency" maxlength="3" value="{{ prop.currency if prop else 'USD' }}"></div>
+    <div><label for="c">Moneda (ISO)</label><input id="c" name="currency" maxlength="3" value="{{ prop.currency if prop else 'ILS' }}"></div>
     <div><label for="i">Día de emisión de cargos</label><input id="i" type="number" min="1" max="28" name="invoice_day" value="{{ prop.invoice_day if prop else 1 }}"></div>
     <div><label for="g">Días de gracia</label><input id="g" type="number" min="0" name="grace_days" value="{{ prop.grace_days if prop else 5 }}"></div>
     <div><label for="e">Alerta "vence pronto" (días)</label><input id="e" type="number" min="1" name="expiring_soon_days" value="{{ prop.expiring_soon_days if prop else 90 }}"></div>

@@ -237,3 +237,20 @@ def test_kpis():
     k = financials.kpis(S, E, UNITS, CH, date(2026, 10, 26))
     assert k.billed_minor == 220000 and k.collected_on_billed_minor == 140000
     assert k.arrears_minor == 20000 + 60000 + 100000 and k.economic_occupancy == 1.0
+
+
+def test_hebrew_statement_cp1255_with_split_description():
+    # Israeli bank layout (e.g. Bank Hapoalim): Hebrew headers, Windows-1255,
+    # separate debit/credit, payer name + reference in a second text column.
+    csv = ('תנועות בחשבון\n\n'
+           'תאריך,תיאור הפעולה,פרטים,אסמכתא,חובה,זכות,יתרה בש"ח,תאריך ערך\n'
+           '02/10/2026,העברה מאת,יוסי כהן CM-101,12345,,"4,500.00","14,500.00",02/10/2026\n'
+           '05/10/2026,חשמל,חברת החשמל,99887,"420.50",,"17,879.50",05/10/2026\n').encode("cp1255")
+    res = parse_statement(csv, "poalim.csv", "a")
+    assert res.report["encoding"] == "cp1255" and not res.errors
+    assert [t.amount_minor for t in res.transactions] == [450000, -42050]
+    assert "CM-101" in res.transactions[0].description and "יוסי כהן" in res.transactions[0].description
+    lease = _lease(9, "101", ["Yossi Cohen"], rent=450000, open_amounts=(450000,), aliases=["יוסי כהן"])
+    t = res.transactions[0]
+    s = matching.match_transactions([matching.TxnInput(1, t.txn_date, t.amount_minor, t.description)], [lease])[1][0]
+    assert s.confidence == "high"

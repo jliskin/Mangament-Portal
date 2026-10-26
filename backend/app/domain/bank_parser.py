@@ -45,7 +45,7 @@ COLUMN_SYNONYMS: dict[str, list[str]] = {
                      "payer", "sender", "name", "counterparty", "pagador", "favorecido"],
     "description": ["descripcion", "concepto", "detalle", "detalles", "movimiento", "glosa",
                     "description", "memo", "details", "narrative", "historico", "lancamento",
-                    "תיאור", "פרטים", "תיאור התנועה"],
+                    "תיאור", "פרטים", "תיאור התנועה", "לטובת", "עבור", "פרטים נוספים"],
 }
 
 DATE_FORMATS_DAYFIRST = ["%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%d/%m/%y", "%d-%m-%y", "%d.%m.%y"]
@@ -105,27 +105,37 @@ class ParseResult:
 # --------------------------------------------------------------------------
 # Raw table readers
 # --------------------------------------------------------------------------
-ENCODINGS = ("utf-8-sig", "cp1252", "cp1255", "latin-1")
+# cp1252 and cp1255 (Hebrew, used by Israeli banks) both decode almost any byte
+# sequence, so "first encoding that doesn't fail" is not enough: every candidate
+# is decoded and the one whose header row is recognised best wins.
+ENCODINGS = ("utf-8-sig", "cp1255", "cp1252", "latin-1")
+
+
+def _split_csv(text: str) -> tuple[list[list[str]], str]:
+    sample = "\n".join(text.splitlines()[:40])
+    try:
+        delimiter = csv.Sniffer().sniff(sample, delimiters=";,\t|").delimiter
+    except csv.Error:
+        delimiter = max(";,\t|", key=sample.count)
+    return list(csv.reader(io.StringIO(text), delimiter=delimiter)), delimiter
 
 
 def _read_csv(content: bytes) -> tuple[list[list[str]], dict]:
-    text, used = None, None
+    best = None
     for enc in ENCODINGS:
         try:
-            text, used = content.decode(enc), enc
-            break
+            text = content.decode(enc)
         except UnicodeDecodeError:
             continue
-    if text is None:  # latin-1 never fails, but keep the type checker honest
+        rows, delimiter = _split_csv(text)
+        hits = _header_hits(rows)
+        if best is None or hits > best[0]:
+            best = (hits, rows, {"encoding": enc, "delimiter": delimiter})
+        if enc == "utf-8-sig" and hits >= 2:
+            break  # valid UTF-8 with a recognisable header is unambiguous
+    if best is None:
         raise StatementParseError("No se pudo decodificar el archivo")
-    sample = "\n".join(text.splitlines()[:40])
-    try:
-        dialect = csv.Sniffer().sniff(sample, delimiters=";,\t|")
-        delimiter = dialect.delimiter
-    except csv.Error:
-        delimiter = max(";,\t|", key=sample.count)
-    rows = list(csv.reader(io.StringIO(text), delimiter=delimiter))
-    return rows, {"encoding": used, "delimiter": delimiter}
+    return best[1], best[2]
 
 
 def _read_xlsx(content: bytes) -> tuple[list[list[object]], dict]:
@@ -167,6 +177,11 @@ def _field_for_header(h: str) -> str | None:
         if any(h.startswith(s + " ") for s in syns):
             return fld
     return None
+
+
+def _header_hits(rows: list[list], scan: int = 30) -> int:
+    return max((len({f for f in (_field_for_header(_norm_header(c)) for c in row) if f})
+                for row in rows[:scan]), default=0)
 
 
 def detect_header_row(rows: list[list], scan: int = 30) -> int:
@@ -279,6 +294,10 @@ def parse_statement(content: bytes, filename: str, account_key: str = "") -> Par
     cols = map_columns(header)
     body = rows[h + 1:]
 
+    # Banks often split the text over several columns (Hapoalim: "תיאור הפעולה"
+    # + "פרטים", where the payer's name and any reference code live). Keep them all.
+    desc_cols = [i for i, c in enumerate(header) if _field_for_header(_norm_header(c)) == "description"]
+
     def column_values(fld: str) -> list:
         return [_cell(r, cols.get(fld)) for r in body if cols.get(fld) is not None]
 
@@ -306,7 +325,7 @@ def parse_statement(content: bytes, filename: str, account_key: str = "") -> Par
             amount = _row_amount(row, cols, decimal_sep)
             if amount == 0:
                 continue
-            description = str(_cell(row, cols.get("description")) or "")
+            description = " ".join(str(_cell(row, i)) for i in desc_cols if not _is_blank(_cell(row, i)))
             counterparty = str(_cell(row, cols.get("counterparty")) or "") or extract_counterparty(description)
             reference = str(_cell(row, cols.get("reference")) or "") or None
             value_date = None

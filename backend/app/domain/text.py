@@ -13,6 +13,9 @@ STOPWORDS = {
     "inmediata", "spei", "sepa", "ach", "wire", "online", "banca", "movil", "app",
     "alquiler", "renta", "aluguel", "rent", "condominio", "expensas", "cuota", "mes",
     "apto", "apt", "depto", "dpto", "unidad", "unit", "piso", "local",
+    # Hebrew banking terms (Israeli statements)
+    "העברה", "העברת", "מאת", "זיכוי", "הפקדה", "ביט", "פייבוקס", "בנקאית", "מזומן", "שכירות", "שכר", "דירה",
+    "ועד", "בית", "בעמ", 'בע"מ',
     # honorifics / legal forms
     "sr", "sra", "srta", "mr", "mrs", "ms", "dr", "dra", "sa", "srl", "sl", "ltda", "ltd",
     "inc", "llc", "cia", "me", "eireli",
