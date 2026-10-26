@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Unidades{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Unidades</h1><div class="muted">{{ rows|length }} unidades · {{ rows|selectattr(1)|list|length }} con contrato</div></div>
+  {% if user.role != 'viewer' %}<a class="btn primary" href="/units/new">+ Nueva unidad</a>{% endif %}
+</div>
+<section class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Unidad</th><th>Piso</th><th>Tipo</th><th class="num">m²</th><th class="num">Renta lista</th><th class="num">Expensas</th><th>Inquilino actual</th><th>Contrato</th><th></th></tr></thead>
+  {% for u, lease, st in rows %}
+  <tr>
+    <td><strong>{{ u.unit_number }}</strong>{% if not u.is_active %} <span class="badge b-info">inactiva</span>{% endif %}</td>
+    <td>{{ u.floor if u.floor is not none }}</td>
+    <td>{{ types[u.unit_type] }}</td>
+    <td class="num">{{ u.size_sqm or '' }}</td>
+    <td class="num">{{ u.baseline_rent_minor|money }}</td>
+    <td class="num">{{ u.condo_fee_minor|money }}</td>
+    <td>{% if lease %}<a href="/leases/{{ lease.id }}">{{ lease.primary_tenant.full_name if lease.primary_tenant }}</a>{% else %}<span class="muted">Vacante</span>{% endif %}</td>
+    <td>{% if lease %}<span class="badge b-{{ st }}">{{ STATUS_LABELS[st] }}</span> hasta {{ lease.end_date|date }}{% elif user.role != 'viewer' %}<a href="/leases/new?unit_id={{ u.id }}">+ contrato</a>{% endif %}</td>
+    <td>{% if user.role != 'viewer' %}<a href="/units/{{ u.id }}/edit">Editar</a>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="9" class="empty">Aún no hay unidades.</td></tr>{% endfor %}
+</table></div></section>
+{% endblock %}

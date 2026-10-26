@@ -1,0 +1,57 @@
+{# One bank credit in the reconciliation workbench. Swapped in place by HTMX after each action. #}
+{% set top = t.suggestions[0] if t.suggestions else None %}
+<tr id="txn-{{ t.id }}" class="{{ 'done' if t.status in ('reconciled', 'ignored') }}">
+  <td>{{ t.txn_date|date }}</td>
+  <td class="txn-desc">
+    {% if t.counterparty_name %}<div class="who">{{ t.counterparty_name }}</div>{% endif %}
+    <div class="muted">{{ t.description }}{% if t.reference %} · ref {{ t.reference }}{% endif %}</div>
+  </td>
+  <td class="num"><strong>{{ t.amount_minor|money }}</strong></td>
+  <td>
+    {% if t.status == 'reconciled' and t.payment %}
+      <span class="badge b-reconciled">Conciliado</span>
+      → <a href="/leases/{{ t.payment.lease_id }}">Unidad {{ t.payment.lease.unit.unit_number }}</a>
+    {% elif t.status == 'ignored' %}
+      <span class="badge b-ignored">Ignorado</span>
+    {% elif top %}
+      <div>
+        <span class="badge b-{{ top.confidence }}">{{ {'high': 'Alta', 'medium': 'Media', 'low': 'Baja'}[top.confidence] }}</span>
+        <span class="score">{{ (top.score * 100)|round|int }}</span>
+        <a href="/leases/{{ top.lease_id }}">Unidad {{ top.lease.unit.unit_number }}</a>
+        · {{ top.lease.primary_tenant.full_name if top.lease.primary_tenant }}
+      </div>
+      <div class="reasons">{% for r in top.reasons %}<span class="reason">{{ r }}</span>{% endfor %}</div>
+      {% if t.suggestions|length > 1 %}
+      <div class="hint">Alternativas:
+        {% for s in t.suggestions[1:] %}U{{ s.lease.unit.unit_number }} ({{ (s.score * 100)|round|int }}){{ ', ' if not loop.last }}{% endfor %}
+      </div>
+      {% endif %}
+    {% else %}
+      <span class="badge b-unmatched">Sin candidato</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if t.status in ('suggested', 'unmatched') %}
+    <div class="actions">
+      {% if top %}
+      <form hx-post="/bank/txn/{{ t.id }}/confirm" hx-target="#txn-{{ t.id }}" hx-swap="outerHTML" class="inline">
+        <input type="hidden" name="lease_id" value="{{ top.lease_id }}">
+        <button class="btn sm primary" title="Crear pago y aplicarlo a la deuda más antigua">✓ Confirmar</button>
+      </form>
+      {% endif %}
+      <form hx-post="/bank/txn/{{ t.id }}/confirm" hx-target="#txn-{{ t.id }}" hx-swap="outerHTML" class="inline actions">
+        <select name="lease_id" aria-label="Asignar a otro contrato">
+          <option value="">Asignar a…</option>
+          {% for l in leases %}<option value="{{ l.id }}">{{ l.unit.unit_number }} · {{ l.primary_tenant.full_name if l.primary_tenant }}</option>{% endfor %}
+        </select>
+        <button class="btn sm">Asignar</button>
+      </form>
+      <button class="btn sm danger" hx-post="/bank/txn/{{ t.id }}/ignore" hx-target="#txn-{{ t.id }}" hx-swap="outerHTML"
+              hx-confirm="¿Ignorar este ingreso? (no es un pago de alquiler)">Ignorar</button>
+    </div>
+    {% else %}
+      <button class="btn sm" hx-post="/bank/txn/{{ t.id }}/undo" hx-target="#txn-{{ t.id }}" hx-swap="outerHTML"
+              hx-confirm="¿Deshacer? Se eliminará el pago y sus aplicaciones.">Deshacer</button>
+    {% endif %}
+  </td>
+</tr>

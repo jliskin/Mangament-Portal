@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false}'>
+  <title>{% block title %}Panel{% endblock %} · Control Platform C.M</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body hx-headers='{"X-CSRF-Token": "{{ csrf }}"}'>
+{% if user %}
+<div class="shell">
+  <aside class="side">
+    <div class="brand">Control Platform C.M<small>Yosef Golan</small></div>
+    {% set path = request.url.path %}
+    <nav class="nav">
+      <a href="/" class="{{ 'active' if path == '/' }}">Panel</a>
+      <a href="/units" class="{{ 'active' if path.startswith('/units') }}">Unidades</a>
+      <a href="/tenants" class="{{ 'active' if path.startswith('/tenants') }}">Inquilinos</a>
+      <a href="/leases" class="{{ 'active' if path.startswith('/leases') }}">Contratos</a>
+      <a href="/charges" class="{{ 'active' if path.startswith('/charges') }}">Cobranza</a>
+      <a href="/bank" class="{{ 'active' if path.startswith('/bank') }}">Banco / Conciliación</a>
+      <a href="/expenses" class="{{ 'active' if path.startswith('/expenses') }}">Gastos</a>
+      <a href="/reports" class="{{ 'active' if path.startswith('/reports') }}">Reportes</a>
+      {% if user.role == 'admin' %}<a href="/settings" class="{{ 'active' if path.startswith('/settings') }}">Configuración</a>{% endif %}
+    </nav>
+    <form method="post" action="/logout">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <div class="muted">{{ user.full_name }} · {{ user.role }}</div>
+      <button class="btn sm">Salir</button>
+    </form>
+  </aside>
+  <main>
+    {% for f in flashes %}<div class="flash {{ f.level }}">{{ f.message }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% else %}
+  {% block public %}{% endblock %}
+{% endif %}
+</body>
+</html>

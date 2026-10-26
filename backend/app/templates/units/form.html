@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Unidad{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ 'Editar unidad ' ~ unit.unit_number if unit and unit.id else 'Nueva unidad' }}</h1><a class="btn" href="/units">← Unidades</a></div>
+<form method="post" action="/units{{ '/' ~ unit.id if unit and unit.id }}" class="card stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="row">
+    <div><label for="n">Número / identificador</label><input id="n" name="unit_number" required value="{{ unit.unit_number if unit }}"></div>
+    <div><label for="f">Piso</label><input id="f" name="floor" type="number" value="{{ unit.floor if unit and unit.floor is not none }}"></div>
+    <div><label for="s">Superficie (m²)</label><input id="s" name="size_sqm" type="number" step="0.01" min="0" value="{{ unit.size_sqm if unit and unit.size_sqm }}">
+      <div class="hint">Se usa para prorratear gastos comunes en el P&amp;L por unidad.</div></div>
+    <div><label for="t">Tipo</label><select id="t" name="unit_type">{% for k, v in types.items() %}<option value="{{ k }}" {{ 'selected' if unit and unit.unit_type == k }}>{{ v }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="row">
+    <div><label for="r">Renta base / lista ({{ currency }})</label><input id="r" name="baseline_rent" inputmode="decimal" value="{{ (unit.baseline_rent_minor / 100) if unit and unit.baseline_rent_minor else '' }}"></div>
+    <div><label for="c">Expensas / cuota de condominio ({{ currency }})</label><input id="c" name="condo_fee" inputmode="decimal" value="{{ (unit.condo_fee_minor / 100) if unit and unit.condo_fee_minor else '' }}"></div>
+    <div><label><input type="checkbox" name="is_active" {{ 'checked' if not unit or unit.is_active }}> Activa</label></div>
+  </div>
+  <label for="no">Notas</label><textarea id="no" name="notes" rows="2">{{ unit.notes if unit and unit.notes }}</textarea>
+  <p><button class="btn primary">Guardar</button></p>
+</form>
+{% endblock %}

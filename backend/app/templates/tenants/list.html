@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Inquilinos{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Inquilinos</h1></div>
+  <div class="actions">
+    <form method="get" action="/tenants" class="actions"><input name="q" value="{{ q }}" placeholder="Buscar por nombre" aria-label="Buscar"><button class="btn">Buscar</button></form>
+    {% if user.role != 'viewer' %}<a class="btn primary" href="/tenants/new">+ Nuevo inquilino</a>{% endif %}
+  </div>
+</div>
+<section class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Nombre</th><th>Teléfono</th><th>Email</th><th>Contacto de emergencia</th><th>Unidades</th></tr></thead>
+  {% for t in tenants %}
+  <tr>
+    <td><a href="/tenants/{{ t.id }}">{{ t.full_name }}</a></td>
+    <td>{{ t.phone or '' }}</td><td>{{ t.email or '' }}</td>
+    <td>{{ t.emergency_contact_name or '' }}{% if t.emergency_contact_phone %} · {{ t.emergency_contact_phone }}{% endif %}</td>
+    <td>{% for link in t.lease_links %}<a href="/leases/{{ link.lease_id }}">{{ link.lease.unit.unit_number }}</a>{{ ', ' if not loop.last }}{% endfor %}</td>
+  </tr>
+  {% else %}<tr><td colspan="5" class="empty">Sin resultados.</td></tr>{% endfor %}
+</table></div></section>
+{% endblock %}

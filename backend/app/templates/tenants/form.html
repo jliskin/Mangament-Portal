@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Inquilino{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ tenant.full_name if tenant and tenant.id else 'Nuevo inquilino' }}</h1><a class="btn" href="/tenants">← Inquilinos</a></div>
+<div class="grid g2">
+<form method="post" action="/tenants{{ '/' ~ tenant.id if tenant and tenant.id }}" class="card stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Datos</h2>
+  <label for="fn">Nombre completo</label><input id="fn" name="full_name" required value="{{ tenant.full_name if tenant and tenant.full_name }}">
+  <div class="row">
+    <div><label for="ph">Teléfono</label><input id="ph" name="phone" value="{{ tenant.phone if tenant and tenant.phone }}"></div>
+    <div><label for="em">Email</label><input id="em" name="email" type="email" value="{{ tenant.email if tenant and tenant.email }}"></div>
+    <div><label for="ni">Documento / ID</label><input id="ni" name="national_id" value="{{ tenant.national_id if tenant and tenant.national_id }}"></div>
+  </div>
+  <div class="row">
+    <div><label for="ecn">Contacto de emergencia</label><input id="ecn" name="emergency_contact_name" value="{{ tenant.emergency_contact_name if tenant and tenant.emergency_contact_name }}"></div>
+    <div><label for="ecp">Teléfono emergencia</label><input id="ecp" name="emergency_contact_phone" value="{{ tenant.emergency_contact_phone if tenant and tenant.emergency_contact_phone }}"></div>
+  </div>
+  <label for="nt">Notas</label><textarea id="nt" name="notes" rows="2">{{ tenant.notes if tenant and tenant.notes }}</textarea>
+  {% if user.role != 'viewer' %}<p><button class="btn primary">Guardar</button></p>{% endif %}
+</form>
+{% if tenant and tenant.id %}
+<section class="card">
+  <h2>Nombres de pagador conocidos</h2>
+  <p class="hint">Cuando el dinero llega desde otra cuenta (cónyuge, empresa, familiar), el sistema aprende ese nombre al confirmar la conciliación. También puede agregarlo manualmente.</p>
+  <table>
+    {% for a in tenant.aliases %}
+    <tr><td>{{ a.alias_normalized }}</td><td><span class="badge b-info">{{ 'aprendido' if a.source == 'learned' else 'manual' }}</span></td>
+      <td>{% if user.role != 'viewer' %}<form method="post" action="/tenants/{{ tenant.id }}/aliases/{{ a.id }}/delete" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm danger">Quitar</button></form>{% endif %}</td></tr>
+    {% else %}<tr><td class="muted">Sin alias.</td></tr>{% endfor %}
+  </table>
+  {% if user.role != 'viewer' %}
+  <form method="post" action="/tenants/{{ tenant.id }}/aliases" class="actions mt">
+    <input type="hidden" name="csrf" value="{{ csrf }}"><input name="alias" placeholder="Ej.: Inversiones Golan SL" aria-label="Nuevo alias"><button class="btn">Agregar</button>
+  </form>
+  {% endif %}
+  <h2 class="mt">Contratos</h2>
+  <ul>{% for link in tenant.lease_links %}<li><a href="/leases/{{ link.lease_id }}">Unidad {{ link.lease.unit.unit_number }}</a> · {{ link.lease.start_date|date }} – {{ link.lease.end_date|date }} ({{ ROLE_LABELS[link.role] }})</li>{% else %}<li class="muted">Ninguno</li>{% endfor %}</ul>
+</section>
+{% endif %}
+</div>
+{% endblock %}

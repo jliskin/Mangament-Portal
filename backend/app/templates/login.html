@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Ingresar{% endblock %}
+{% block public %}
+<div class="login card">
+  <h1>Control Platform C.M</h1>
+  <p class="muted">Yosef Golan · Gestión de propiedades</p>
+  {% for f in flashes %}<div class="flash {{ f.level }}">{{ f.message }}</div>{% endfor %}
+  <form method="post" action="/login" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" autocomplete="username" required autofocus>
+    <label for="password">Contraseña</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <p><button class="btn primary">Ingresar</button></p>
+  </form>
+</div>
+{% endblock %}

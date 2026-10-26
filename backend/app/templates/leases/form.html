@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Nuevo contrato{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Nuevo contrato</h1><a class="btn" href="/leases">← Contratos</a></div>
+{% if not tenants %}<div class="flash error">Primero cree el inquilino en <a href="/tenants/new">Inquilinos</a>.</div>{% endif %}
+<form method="post" action="/leases" enctype="multipart/form-data" class="card stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="row">
+    <div><label for="u">Unidad</label><select id="u" name="unit_id" required>{% for u in units %}<option value="{{ u.id }}" {{ 'selected' if unit_id == u.id }}>{{ u.unit_number }} — lista {{ u.baseline_rent_minor|money }} + {{ u.condo_fee_minor|money }}</option>{% endfor %}</select></div>
+    <div><label for="t">Inquilino titular</label><select id="t" name="tenant_id" required>{% for t in tenants %}<option value="{{ t.id }}">{{ t.full_name }}</option>{% endfor %}</select></div>
+    <div><label for="co">Co-inquilinos</label><select id="co" name="co_tenant_ids" multiple size="3">{% for t in tenants %}<option value="{{ t.id }}">{{ t.full_name }}</option>{% endfor %}</select></div>
+  </div>
+  <h2 class="mt">Fechas</h2>
+  <div class="row">
+    <div><label for="sd">Firma</label><input id="sd" type="date" name="signed_date"></div>
+    <div><label for="st">Inicio (facturación)</label><input id="st" type="date" name="start_date" required></div>
+    <div><label for="en">Entrada / entrega de llaves</label><input id="en" type="date" name="entry_date"></div>
+    <div><label for="ed">Vencimiento</label><input id="ed" type="date" name="end_date" required></div>
+  </div>
+  <h2 class="mt">Condiciones económicas ({{ currency }})</h2>
+  <div class="row">
+    <div><label for="r">Alquiler mensual</label><input id="r" name="monthly_rent" inputmode="decimal"><div class="hint">Vacío = renta de lista de la unidad</div></div>
+    <div><label for="c">Expensas mensuales</label><input id="c" name="monthly_condo_fee" inputmode="decimal"><div class="hint">Vacío = expensas estándar de la unidad</div></div>
+    <div><label for="dd">Día de vencimiento de pago</label><input id="dd" type="number" min="1" max="28" name="due_day" value="5"></div>
+    <div><label for="dep">Depósito en garantía</label><input id="dep" name="security_deposit" inputmode="decimal"></div>
+  </div>
+  <h2 class="mt">Renovación</h2>
+  <div class="row">
+    <div><label><input type="checkbox" name="has_renewal_option"> Tiene opción de renovación/extensión</label></div>
+    <div><label for="rom">Meses de la opción</label><input id="rom" type="number" min="1" name="renewal_option_months"></div>
+    <div><label for="rnd">Preaviso para ejercerla (días)</label><input id="rnd" type="number" min="0" name="renewal_notice_days"></div>
+  </div>
+  <label for="cf">Contrato firmado (PDF / imagen escaneada)</label><input id="cf" type="file" name="contract_file" accept=".pdf,.png,.jpg,.jpeg">
+  <label for="nt">Notas</label><textarea id="nt" name="notes" rows="2"></textarea>
+  <p><button class="btn primary">Crear contrato</button></p>
+</form>
+{% endblock %}

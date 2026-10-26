@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Reportes{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Reportes financieros</h1><div class="muted">{{ start|date }} – {{ end|date }} · {{ currency }}</div></div>
+  <form method="get" action="/reports" class="actions">
+    <input type="date" name="start" value="{{ start.isoformat() }}" aria-label="Desde"><input type="date" name="end" value="{{ end.isoformat() }}" aria-label="Hasta">
+    <button class="btn">Aplicar</button>
+  </form>
+</div>
+
+<div class="grid g2">
+  {% for title, r in [('Estado de resultados — devengado (facturado)', accrual), ('Estado de resultados — caja (cobrado)', cash)] %}
+  <section class="card">
+    <h2>{{ title }}</h2>
+    <table>
+      {% for k, v in r.revenue_by_type.items() %}<tr><td>{{ CHARGE_LABELS.get(k, 'Cobros') }}</td><td class="num">{{ v|money }}</td></tr>{% endfor %}
+      <tr><td><strong>Ingresos (EGI)</strong></td><td class="num"><strong>{{ r.revenue_minor|money }}</strong></td></tr>
+      {% for k, v in r.opex_by_category.items() %}<tr><td class="muted">− {{ cat_names.get(k, k) }}</td><td class="num">{{ v|money }}</td></tr>{% endfor %}
+      <tr><td><strong>Gastos operativos</strong></td><td class="num"><strong>{{ r.opex_minor|money }}</strong></td></tr>
+      <tr><td><strong>NOI</strong> (margen {{ r.noi_margin|pct(1) }})</td><td class="num {{ 'neg' if r.noi_minor < 0 }}"><strong>{{ r.noi_minor|money }}</strong></td></tr>
+      <tr><td class="muted">− CapEx</td><td class="num">{{ r.capex_minor|money }}</td></tr>
+      <tr><td>Flujo antes de deuda</td><td class="num {{ 'neg' if r.cash_flow_before_debt_minor < 0 }}">{{ r.cash_flow_before_debt_minor|money }}</td></tr>
+    </table>
+  </section>
+  {% endfor %}
+</div>
+
+<section class="card">
+  <div class="page-head"><h2>Rentabilidad por unidad</h2><a class="btn sm" href="/reports/pnl.csv?start={{ start.isoformat() }}&end={{ end.isoformat() }}">Exportar CSV</a></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Unidad</th><th class="num">Facturado</th><th class="num">Cobrado</th><th class="num">% cobro</th><th class="num">Gasto directo</th><th class="num">Gasto común (m²)</th><th class="num">NOI</th><th class="num">Pendiente</th></tr></thead>
+    {% for r in pnl %}
+    <tr><td>{{ r.unit_number }}</td><td class="num">{{ r.revenue_minor|money }}</td><td class="num">{{ r.collected_minor|money }}</td>
+      <td class="num">{{ r.collection_rate|pct }}</td><td class="num">{{ r.direct_opex_minor|money }}</td><td class="num">{{ r.allocated_opex_minor|money }}</td>
+      <td class="num {{ 'neg' if r.noi_minor < 0 }}"><strong>{{ r.noi_minor|money }}</strong></td><td class="num {{ 'neg' if r.outstanding_minor }}">{{ r.outstanding_minor|money }}</td></tr>
+    {% endfor %}
+    <tfoot><tr><td>Total</td>{% for k in ['revenue_minor', 'collected_minor'] %}<td class="num">{{ pnl_total[k]|money }}</td>{% endfor %}<td></td>
+      {% for k in ['direct_opex_minor', 'allocated_opex_minor', 'noi_minor', 'outstanding_minor'] %}<td class="num">{{ pnl_total[k]|money }}</td>{% endfor %}</tr></tfoot>
+  </table></div>
+  <p class="hint">El NOI total por unidad puede diferir del NOI del edificio solo si hay ingresos no asignados a unidades. CapEx excluido.</p>
+</section>
+
+<section class="card">
+  <div class="page-head"><h2>Morosidad por antigüedad (al día de hoy)</h2><a class="btn sm" href="/reports/aging.csv">Exportar CSV</a></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Unidad</th><th>Inquilino</th><th>Vencido desde</th>{% for k, label in buckets %}<th class="num">{{ label }}</th>{% endfor %}<th class="num">Total</th></tr></thead>
+    {% for lease, a in aging %}
+    <tr><td><a href="/leases/{{ lease.id }}">{{ lease.unit.unit_number }}</a></td><td>{{ lease.primary_tenant.full_name if lease.primary_tenant }}</td><td>{{ a.oldest_due|date }}</td>
+      {% for k, _ in buckets %}<td class="num">{{ a.buckets[k]|money if a.buckets[k] else '' }}</td>{% endfor %}<td class="num"><strong>{{ a.total_minor|money }}</strong></td></tr>
+    {% else %}<tr><td colspan="9" class="muted">Sin deuda.</td></tr>{% endfor %}
+  </table></div>
+</section>
+{% endblock %}

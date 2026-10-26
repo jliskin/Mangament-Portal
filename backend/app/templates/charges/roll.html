@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Cobranza{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Cobranza — planilla de pagos</h1>
+    <div class="muted">Reemplaza la planilla Excel: una fila por unidad, una columna por mes. Pase el mouse para ver importes.</div></div>
+  {% if user.role != 'viewer' %}
+  <form method="post" action="/charges/generate" class="actions">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="month" name="period" value="{{ today.strftime('%Y-%m') }}" aria-label="Período">
+    <button class="btn">Emitir cargos del mes</button>
+  </form>
+  {% endif %}
+</div>
+<section class="card">
+  <div class="legend"><span><span class="dot paid"></span> Pagado</span><span><span class="dot partial"></span> Parcial</span>
+    <span><span class="dot unpaid"></span> Impago y vencido</span><span><span class="dot unpaid notlate"></span> Impago, aún en plazo</span></div>
+  <div class="table-wrap mt"><table class="roll">
+    <thead><tr><th>Unidad</th>{% for m in months %}<th class="num">{{ m|month }}</th>{% endfor %}</tr></thead>
+    {% for u in units %}
+    <tr>
+      <td><strong>{{ u.unit_number }}</strong>{% if not u.occupied %} <span class="muted">vacante</span>{% endif %}</td>
+      {% for m in months %}{% set cell = matrix.get(u.unit_id, {}).get(m) %}
+      <td class="cell">{% if cell %}<span class="dot {{ cell.status }} {{ 'notlate' if cell.status == 'unpaid' and not cell.late }}" title="{{ cell.allocated|money }} / {{ cell.amount|money }}"></span>
+        <div class="hint">{{ (cell.amount - cell.allocated)|money if cell.status != 'paid' else '' }}</div>{% else %}<span class="muted">·</span>{% endif %}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table></div>
+</section>
+{% endblock %}

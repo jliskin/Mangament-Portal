@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Conciliación bancaria{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Conciliación bancaria</h1>
+    <div class="muted">{{ counts.get('suggested', 0) }} con sugerencia · {{ counts.get('unmatched', 0) }} sin candidato ·
+      {{ counts.get('reconciled', 0) }} conciliados</div>
+  </div>
+  <div class="actions">
+    {% if high %}
+    <form method="post" action="/bank/confirm-high" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn primary">✓ Confirmar {{ high }} de alta confianza</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/bank/rematch" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Recalcular sugerencias</button>
+    </form>
+    <a class="btn" href="/bank/debits">Débitos → gastos ({{ debits }})</a>
+  </div>
+</div>
+
+<details class="card" {{ 'open' if not rows and status == 'open' }}>
+  <summary>Importar extracto bancario (CSV / XLSX)</summary>
+  {% if accounts %}
+  <form method="post" action="/bank/import" enctype="multipart/form-data" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="row">
+      <div><label for="acc">Cuenta</label>
+        <select id="acc" name="bank_account_id">{% for a in accounts %}<option value="{{ a.id }}">{{ a.name }}{% if a.account_mask %} ·· {{ a.account_mask }}{% endif %}</option>{% endfor %}</select></div>
+      <div><label for="file">Archivo</label><input id="file" type="file" name="file" accept=".csv,.txt,.xlsx" required></div>
+    </div>
+    <p class="hint">Se detectan automáticamente: fila de encabezados, columnas (fecha, concepto, importe o crédito/débito, saldo),
+      separador decimal y formato de fecha. Reimportar un extracto superpuesto no duplica movimientos.</p>
+    <p><button class="btn primary">Importar y conciliar</button></p>
+  </form>
+  {% else %}
+  <p>Primero agregue una cuenta bancaria en <a href="/settings">Configuración</a>.</p>
+  {% endif %}
+</details>
+
+<section class="card">
+  <div class="filters">
+    {% for key, label in [('open', 'Pendientes'), ('reconciled', 'Conciliados'), ('ignored', 'Ignorados'), ('all', 'Todos')] %}
+      <a href="/bank?status={{ key }}" class="{{ 'on' if status == key }}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  {% if rows %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Fecha</th><th>Pagador / descripción</th><th class="num">Importe</th><th>Sugerencia</th><th>Acción</th></tr></thead>
+    <tbody>
+      {% for t in rows %}{% include "partials/txn_row.html" %}{% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <p class="empty">No hay ingresos {{ 'pendientes' if status == 'open' else 'en esta vista' }}.</p>
+  {% endif %}
+</section>
+
+{% if imports %}
+<section class="card">
+  <h2>Últimas importaciones</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Fecha</th><th>Origen</th><th class="num">Filas</th><th class="num">Nuevas</th><th class="num">Duplicadas</th><th class="num">Errores</th><th>Detección</th></tr></thead>
+    {% for i in imports %}
+    <tr>
+      <td>{{ i.imported_at.strftime('%d/%m/%Y %H:%M') }}</td>
+      <td>{{ 'Archivo' if i.source == 'file' else 'API' }}{% if i.document_id %} · <a href="/documents/{{ i.document_id }}">descargar</a>{% endif %}</td>
+      <td class="num">{{ i.rows_total }}</td><td class="num">{{ i.rows_imported }}</td>
+      <td class="num">{{ i.rows_duplicate }}</td><td class="num {{ 'neg' if i.rows_error }}">{{ i.rows_error }}</td>
+      <td class="muted">
+        {% if i.parse_report.columns %}{{ i.parse_report.columns.values()|join(', ') }} · dec "{{ i.parse_report.decimal_separator }}" · {{ i.parse_report.date_order }}{% endif %}
+        {% if i.parse_report.errors %}
+        <details><summary>Ver errores</summary>
+          <ul>{% for e in i.parse_report.errors[:20] %}<li>Fila {{ e.row }}: {{ e.message }}</li>{% endfor %}</ul>
+        </details>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table></div>
+</section>
+{% endif %}
+{% endblock %}

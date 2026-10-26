@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Débitos del extracto{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Débitos sin clasificar</h1>
+    <div class="muted">Egresos del extracto: regístrelos como gasto operativo (entran al NOI) o ignórelos si no corresponden al edificio.</div></div>
+  <a class="btn" href="/bank">← Conciliación</a>
+</div>
+<section class="card">
+  {% if rows %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Fecha</th><th>Descripción</th><th class="num">Importe</th><th>Registrar como gasto</th><th></th></tr></thead>
+    {% for t in rows %}
+    <tr>
+      <td>{{ t.txn_date|date }}</td>
+      <td>{{ t.description }}</td>
+      <td class="num neg">{{ t.amount_minor|money }}</td>
+      <td>
+        <form method="post" action="/bank/txn/{{ t.id }}/expense" class="actions">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <select name="category_id" required aria-label="Categoría">
+            {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+          </select>
+          <select name="unit_id" aria-label="Unidad">
+            <option value="">Edificio (común)</option>
+            {% for u in units %}<option value="{{ u.id }}">Unidad {{ u.unit_number }}</option>{% endfor %}
+          </select>
+          <input name="description" value="{{ t.description }}" aria-label="Descripción">
+          <button class="btn sm primary">Registrar</button>
+        </form>
+      </td>
+      <td>
+        <form method="post" action="/bank/txn/{{ t.id }}/ignore-debit" class="inline">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm danger">Ignorar</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table></div>
+  {% else %}<p class="empty">No hay débitos pendientes.</p>{% endif %}
+</section>
+{% endblock %}

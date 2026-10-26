@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Contrato {{ lease.unit.unit_number }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Unidad {{ lease.unit.unit_number }} · {{ lease.primary_tenant.full_name if lease.primary_tenant }}</h1>
+    <div class="muted"><span class="badge b-{{ status }}">{{ STATUS_LABELS[status] }}</span>
+      Código de pago <code>{{ lease.payment_reference }}</code> — pida a los inquilinos incluirlo en la transferencia.</div>
+  </div>
+  <a class="btn" href="/leases">← Contratos</a>
+</div>
+
+<section class="kpis">
+  <div class="kpi {{ 'alert' if balance > 0 }}"><div class="label">Saldo pendiente</div><div class="value {{ 'neg' if balance > 0 }}">{{ balance|money }}</div><div class="sub">{{ currency }}</div></div>
+  <div class="kpi"><div class="label">Saldo a favor</div><div class="value">{{ credit|money }}</div><div class="sub">se aplica a próximos cargos</div></div>
+  <div class="kpi"><div class="label">Cuota mensual</div><div class="value">{{ lease.monthly_total_minor|money }}</div><div class="sub">{{ lease.monthly_rent_minor|money }} alquiler + {{ lease.monthly_condo_fee_minor|money }} expensas</div></div>
+  <div class="kpi"><div class="label">Depósito</div><div class="value">{{ lease.security_deposit_minor|money }}</div><div class="sub">devuelto {{ lease.deposit_returned_minor|money }}</div></div>
+</section>
+
+<div class="grid g2">
+  <section class="card">
+    <h2>Contrato</h2>
+    <table>
+      <tr><th>Firma</th><td>{{ lease.signed_date|date }}</td></tr>
+      <tr><th>Inicio</th><td>{{ lease.start_date|date }}</td></tr>
+      <tr><th>Entrada</th><td>{{ lease.entry_date|date }}</td></tr>
+      <tr><th>Vencimiento</th><td>{{ lease.end_date|date }} ({{ (lease.end_date - today).days }} días)</td></tr>
+      {% if lease.exit_date %}<tr><th>Salida</th><td>{{ lease.exit_date|date }}</td></tr>{% endif %}
+      {% if lease.terminated_at %}<tr><th>Rescisión</th><td>{{ lease.terminated_at|date }} — {{ lease.termination_reason }}</td></tr>{% endif %}
+      <tr><th>Vence el pago</th><td>día {{ lease.due_day }} de cada mes (+{{ prop.grace_days }} días de gracia)</td></tr>
+      <tr><th>Renovación</th><td>{% if lease.has_renewal_option %}Opción de {{ lease.renewal_option_months or '?' }} meses, preaviso {{ lease.renewal_notice_days or '?' }} días{% else %}Sin opción{% endif %}</td></tr>
+      <tr><th>Partes</th><td>{% for p in lease.parties %}<a href="/tenants/{{ p.tenant_id }}">{{ p.tenant.full_name }}</a> ({{ ROLE_LABELS[p.role] }}){{ ', ' if not loop.last }}{% endfor %}</td></tr>
+      <tr><th>Documento</th><td>{% if lease.contract_document %}<a href="/documents/{{ lease.contract_document.id }}">{{ lease.contract_document.original_filename }}</a>{% else %}<span class="muted">No cargado</span>{% endif %}</td></tr>
+    </table>
+    {% if lease.extensions %}
+    <h2 class="mt">Historial de extensiones</h2>
+    <table><tr><th>Fecha</th><th>Vencimiento</th><th class="num">Alquiler</th><th>Doc.</th></tr>
+      {% for e in lease.extensions %}<tr><td>{{ e.created_at.date()|date }}</td><td>{{ e.previous_end_date|date }} → {{ e.new_end_date|date }}</td>
+        <td class="num">{{ e.previous_rent_minor|money }} → {{ e.new_rent_minor|money }}</td><td>{% if e.document_id %}<a href="/documents/{{ e.document_id }}">PDF</a>{% endif %}</td></tr>{% endfor %}
+    </table>
+    {% endif %}
+  </section>
+
+  {% if user.role != 'viewer' and not lease.terminated_at %}
+  <section class="card">
+    <details open><summary>Registrar pago manual (efectivo / cheque)</summary>
+      <form method="post" action="/leases/{{ lease.id }}/payments" class="stack">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="row">
+          <div><label for="pa">Importe</label><input id="pa" name="amount" inputmode="decimal" required></div>
+          <div><label for="pd">Fecha</label><input id="pd" type="date" name="received_date" value="{{ today.isoformat() }}" required></div>
+          <div><label for="pm">Medio</label><select id="pm" name="method"><option value="cash">Efectivo</option><option value="check">Cheque</option><option value="card">Tarjeta</option><option value="bank_transfer">Transferencia</option><option value="other">Otro</option></select></div>
+        </div>
+        <label for="pn">Notas</label><input id="pn" name="notes">
+        <p><button class="btn primary">Registrar pago</button></p>
+      </form>
+    </details>
+    <details class="mt"><summary>Extender / renovar</summary>
+      <form method="post" action="/leases/{{ lease.id }}/extend" enctype="multipart/form-data" class="stack">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="row">
+          <div><label for="ne">Nuevo vencimiento</label><input id="ne" type="date" name="new_end_date" required></div>
+          <div><label for="nr">Nuevo alquiler</label><input id="nr" name="new_rent" inputmode="decimal" placeholder="{{ lease.monthly_rent_minor / 100 }}"></div>
+          <div><label for="nc">Nuevas expensas</label><input id="nc" name="new_condo_fee" inputmode="decimal" placeholder="{{ lease.monthly_condo_fee_minor / 100 }}"></div>
+          <div><label for="ns">Firma</label><input id="ns" type="date" name="signed_date"></div>
+        </div>
+        <label for="xf">Adenda firmada</label><input id="xf" type="file" name="extension_file" accept=".pdf,.png,.jpg,.jpeg">
+        <label for="xn">Notas</label><input id="xn" name="notes">
+        <p><button class="btn primary">Extender contrato</button></p>
+      </form>
+    </details>
+    <details class="mt"><summary>Rescindir contrato</summary>
+      <form method="post" action="/leases/{{ lease.id }}/terminate" class="stack">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <div class="row">
+          <div><label for="td">Fecha de rescisión</label><input id="td" type="date" name="termination_date" required></div>
+          <div><label for="xd">Salida efectiva</label><input id="xd" type="date" name="exit_date"></div>
+          <div><label for="dr">Depósito devuelto</label><input id="dr" name="deposit_returned" inputmode="decimal"></div>
+        </div>
+        <label for="rr">Motivo</label><input id="rr" name="reason" required>
+        <p class="hint">Se anulan los cargos impagos de meses posteriores a la rescisión.</p>
+        <p><button class="btn danger">Rescindir</button></p>
+      </form>
+    </details>
+  </section>
+  {% endif %}
+</div>
+
+<section class="card">
+  <h2>Cuenta corriente</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Período</th><th>Concepto</th><th>Vence</th><th class="num">Importe</th><th class="num">Pagado</th><th class="num">Pendiente</th><th>Estado</th></tr></thead>
+    {% for c in charges %}
+    <tr class="{{ 'done' if c.voided_at }}">
+      <td>{{ c.period|month }}</td><td>{{ c.description or CHARGE_LABELS[c.charge_type] }}</td><td>{{ c.due_date|date }}</td>
+      <td class="num">{{ c.amount_minor|money }}</td><td class="num">{{ c.allocated_minor|money }}</td>
+      <td class="num {{ 'neg' if c.outstanding_minor > 0 and not c.voided_at }}">{{ c.outstanding_minor|money }}</td>
+      <td>{% if c.voided_at %}<span class="badge b-info">Anulado</span>{% else %}<span class="badge b-{{ c.payment_status }}">{{ PAY_LABELS[c.payment_status] }}</span>{% endif %}</td>
+    </tr>
+    {% else %}<tr><td colspan="7" class="muted">Sin cargos emitidos todavía.</td></tr>{% endfor %}
+  </table></div>
+</section>
+
+<section class="card">
+  <h2>Pagos recibidos</h2>
+  <table>
+    <thead><tr><th>Fecha</th><th>Medio</th><th class="num">Importe</th><th class="num">Aplicado</th><th class="num">A favor</th><th>Origen</th></tr></thead>
+    {% for p in payments %}
+    <tr><td>{{ p.received_date|date }}</td><td>{{ METHOD_LABELS[p.method] }}</td><td class="num">{{ p.amount_minor|money }}</td>
+      <td class="num">{{ (p.amount_minor - p.unapplied_minor)|money }}</td><td class="num">{{ p.unapplied_minor|money }}</td>
+      <td>{{ 'Extracto bancario' if p.bank_transaction_id else (p.notes or 'Manual') }}</td></tr>
+    {% else %}<tr><td colspan="6" class="muted">Sin pagos.</td></tr>{% endfor %}
+  </table>
+</section>
+{% endblock %}

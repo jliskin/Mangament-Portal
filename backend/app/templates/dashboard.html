@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Panel{% endblock %}
+{% block content %}
+{% if empty %}
+  <div class="card empty">
+    <h1>Bienvenido</h1>
+    <p>Configure primero el edificio (moneda, día de facturación) en <a href="/settings">Configuración</a>.</p>
+  </div>
+{% else %}
+<div class="page-head">
+  <div>
+    <h1>{{ property.name }}</h1>
+    <div class="muted">Situación al {{ today|date }} · moneda {{ currency }}</div>
+  </div>
+  <div class="actions">
+    <a class="btn primary" href="/bank">Importar extracto / conciliar</a>
+    <a class="btn" href="/expenses/new">Registrar gasto</a>
+  </div>
+</div>
+
+<section class="kpis" aria-label="Indicadores clave">
+  <div class="kpi">
+    <div class="label">NOI del mes</div>
+    <div class="value {{ 'neg' if noi_mtd.noi_minor < 0 }}">{{ noi_mtd.noi_minor|money }}</div>
+    <div class="sub">Margen {{ noi_mtd.noi_margin|pct }} · base devengado</div>
+  </div>
+  <div class="kpi">
+    <div class="label">NOI acumulado {{ today.year }}</div>
+    <div class="value {{ 'neg' if noi_ytd.noi_minor < 0 }}">{{ noi_ytd.noi_minor|money }}</div>
+    <div class="sub">Ingresos {{ noi_ytd.revenue_minor|money }} · Gastos {{ noi_ytd.opex_minor|money }}</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Cobranza del mes</div>
+    <div class="value">{{ kpis.collection_rate|pct }}</div>
+    <div class="sub">{{ kpis.collected_on_billed_minor|money }} de {{ kpis.billed_minor|money }} facturado</div>
+  </div>
+  <div class="kpi {{ 'alert' if kpis.arrears_minor > 0 }}">
+    <div class="label">Deuda vencida</div>
+    <div class="value {{ 'neg' if kpis.arrears_minor > 0 }}">{{ kpis.arrears_minor|money }}</div>
+    <div class="sub">{{ aging_rows|length }} contrato(s) con saldo</div>
+  </div>
+  <div class="kpi">
+    <div class="label">Ocupación</div>
+    <div class="value">{{ kpis.physical_occupancy|pct }}</div>
+    <div class="sub">Económica {{ kpis.economic_occupancy|pct }} (renta vs. renta de lista)</div>
+  </div>
+  <a class="kpi {{ 'alert' if queue.get('unmatched', 0) or queue.get('suggested', 0) }}" href="/bank">
+    <div class="label">Pendiente de conciliar</div>
+    <div class="value">{{ queue.get('suggested', 0) + queue.get('unmatched', 0) }}</div>
+    <div class="sub">{{ queue.get('suggested', 0) }} con sugerencia · {{ queue.get('unmatched', 0) }} sin candidato</div>
+  </a>
+</section>
+
+<div class="grid g2">
+  <section class="card chart">
+    <h2>Ingresos vs NOI — últimos 12 meses</h2>
+    {% set slot = 60 %}{% set base = 170 %}{% set hmax = 150 %}
+    <svg viewBox="0 0 {{ slot * series|length }} 200" role="img" aria-label="Ingresos y NOI mensuales">
+      <line x1="0" x2="{{ slot * series|length }}" y1="{{ base }}" y2="{{ base }}" stroke="currentColor" stroke-opacity=".2"/>
+      {% for r in series %}
+        {% set x = loop.index0 * slot %}
+        {% set hr = (r.revenue_minor / chart_max * hmax)|round(1) %}
+        {% set hn = (r.noi_minor|abs / chart_max * hmax)|round(1) %}
+        <rect class="bar-rev" x="{{ x + 8 }}" y="{{ base - hr }}" width="20" height="{{ hr }}"><title>{{ r.start|month }} ingresos {{ r.revenue_minor|money }}</title></rect>
+        {% if r.noi_minor >= 0 %}
+        <rect class="bar-noi" x="{{ x + 30 }}" y="{{ base - hn }}" width="20" height="{{ hn }}"><title>{{ r.start|month }} NOI {{ r.noi_minor|money }}</title></rect>
+        {% else %}
+        <rect class="bar-neg" x="{{ x + 30 }}" y="{{ base }}" width="20" height="{{ [hn, 25]|min }}"><title>{{ r.start|month }} NOI {{ r.noi_minor|money }}</title></rect>
+        {% endif %}
+        <text x="{{ x + 30 }}" y="196" text-anchor="middle">{{ r.start|month }}</text>
+      {% endfor %}
+    </svg>
+    <div class="legend"><span><span class="swatch rev"></span>Ingresos facturados</span><span><span class="swatch noi"></span>NOI</span></div>
+  </section>
+
+  <section class="card">
+    <h2>Alertas de contratos</h2>
+    {% if alerts %}
+    <table>
+      {% for lease, a in alerts[:8] %}
+      <tr>
+        <td><span class="badge b-{{ a.level }}">{{ {'critical': 'Crítica', 'warning': 'Aviso', 'info': 'Info'}[a.level] }}</span></td>
+        <td><a href="/leases/{{ lease.id }}">{{ a.message }}</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="muted">Sin alertas.</p>{% endif %}
+    {% if expiring %}
+    <h2 class="mt">Vencen pronto / vencidos</h2>
+    <table>
+      <tr><th>Unidad</th><th>Inquilino</th><th>Vence</th><th>Estado</th></tr>
+      {% for l, st in expiring[:6] %}
+      <tr>
+        <td><a href="/leases/{{ l.id }}">{{ l.unit.unit_number }}</a></td>
+        <td>{{ l.primary_tenant.full_name if l.primary_tenant }}</td>
+        <td>{{ l.end_date|date }}</td>
+        <td><span class="badge b-{{ st }}">{{ STATUS_LABELS[st] }}</span></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <div class="page-head"><h2>Antigüedad de deuda (aging)</h2><a class="btn sm" href="/reports/aging.csv">Exportar CSV</a></div>
+  {% if aging_rows %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Unidad</th><th>Inquilino</th>{% for k, label in aging_buckets %}<th class="num">{{ label }}</th>{% endfor %}<th class="num">Total</th></tr></thead>
+    <tbody>
+    {% for lease, a in aging_rows[:12] %}
+      <tr>
+        <td><a href="/leases/{{ lease.id }}">{{ lease.unit.unit_number }}</a></td>
+        <td>{{ lease.primary_tenant.full_name if lease.primary_tenant }}</td>
+        {% for k, _ in aging_buckets %}<td class="num {{ 'neg' if a.buckets[k] and k != 'current' }}">{{ a.buckets[k]|money if a.buckets[k] else '' }}</td>{% endfor %}
+        <td class="num"><strong>{{ a.total_minor|money }}</strong></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><td colspan="2">Total</td>{% for k, _ in aging_buckets %}<td class="num">{{ aging_totals[k]|money }}</td>{% endfor %}<td class="num">{{ aging_totals.values()|sum|money }}</td></tr></tfoot>
+  </table></div>
+  {% else %}<p class="muted">No hay saldos pendientes.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Configuración{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Configuración</h1></div>
+<div class="grid g2">
+<form method="post" action="/settings/property" class="card stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Edificio</h2>
+  <label for="n">Nombre</label><input id="n" name="name" required value="{{ prop.name if prop else 'C.M / Yosef Golan' }}">
+  <label for="a">Dirección</label><input id="a" name="address" value="{{ prop.address if prop and prop.address }}">
+  <div class="row">
+    <div><label for="c">Moneda (ISO)</label><input id="c" name="currency" maxlength="3" value="{{ prop.currency if prop else 'USD' }}"></div>
+    <div><label for="i">Día de emisión de cargos</label><input id="i" type="number" min="1" max="28" name="invoice_day" value="{{ prop.invoice_day if prop else 1 }}"></div>
+    <div><label for="g">Días de gracia</label><input id="g" type="number" min="0" name="grace_days" value="{{ prop.grace_days if prop else 5 }}"></div>
+    <div><label for="e">Alerta "vence pronto" (días)</label><input id="e" type="number" min="1" name="expiring_soon_days" value="{{ prop.expiring_soon_days if prop else 90 }}"></div>
+  </div>
+  <p><button class="btn primary">Guardar</button></p>
+</form>
+<section class="card">
+  <h2>Cuentas bancarias</h2>
+  <table>{% for a in accounts %}<tr><td>{{ a.name }}</td><td>{{ a.bank_name or '' }}</td><td>{{ '·· ' ~ a.account_mask if a.account_mask }}</td><td>{{ a.currency }}</td></tr>{% else %}<tr><td class="muted">Ninguna.</td></tr>{% endfor %}</table>
+  {% if prop %}
+  <form method="post" action="/settings/bank-accounts" class="stack mt">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="row"><div><label for="bn">Nombre</label><input id="bn" name="name" required placeholder="Cuenta alquileres"></div>
+      <div><label for="bb">Banco</label><input id="bb" name="bank_name"></div>
+      <div><label for="bm">Últimos 4 dígitos</label><input id="bm" name="account_mask" maxlength="4"></div></div>
+    <p class="hint">Nunca se guarda el número completo de cuenta.</p>
+    <p><button class="btn">Agregar cuenta</button></p>
+  </form>
+  {% endif %}
+  <h2 class="mt">Usuarios</h2>
+  <table>{% for u in users %}<tr><td>{{ u.full_name }}</td><td>{{ u.email }}</td><td><span class="badge b-info">{{ u.role }}</span></td></tr>{% endfor %}</table>
+  <form method="post" action="/settings/users" class="stack mt">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="row"><div><label for="un">Nombre</label><input id="un" name="full_name" required></div>
+      <div><label for="ue">Email</label><input id="ue" type="email" name="email" required></div>
+      <div><label for="up">Contraseña (mín. 10)</label><input id="up" type="password" name="password" minlength="10" required autocomplete="new-password"></div>
+      <div><label for="ur">Rol</label><select id="ur" name="role"><option value="viewer">Solo lectura</option><option value="manager">Gestor</option><option value="admin">Administrador</option></select></div></div>
+    <p><button class="btn">Crear usuario</button></p>
+  </form>
+</section>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Contratos{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Contratos</h1>
+    <div class="filters">
+      {% for key, label in [('', 'Todos'), ('active', 'Activos'), ('expiring_soon', 'Vencen pronto'), ('expired', 'Vencidos'), ('upcoming', 'Por iniciar'), ('terminated', 'Rescindidos')] %}
+      <a href="/leases{{ '?status=' ~ key if key }}" class="{{ 'on' if status == key }}">{{ label }}</a>{% endfor %}
+    </div>
+  </div>
+  {% if user.role != 'viewer' %}<a class="btn primary" href="/leases/new">+ Nuevo contrato</a>{% endif %}
+</div>
+<section class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Unidad</th><th>Inquilino</th><th>Código de pago</th><th>Inicio</th><th>Vence</th><th class="num">Alquiler</th><th class="num">Expensas</th><th class="num">Depósito</th><th>Estado</th><th>Contrato</th></tr></thead>
+  {% for l, st in rows %}
+  <tr>
+    <td><a href="/leases/{{ l.id }}"><strong>{{ l.unit.unit_number }}</strong></a></td>
+    <td>{{ l.primary_tenant.full_name if l.primary_tenant }}</td>
+    <td><code>{{ l.payment_reference }}</code></td>
+    <td>{{ l.start_date|date }}</td><td>{{ l.end_date|date }}</td>
+    <td class="num">{{ l.monthly_rent_minor|money }}</td><td class="num">{{ l.monthly_condo_fee_minor|money }}</td>
+    <td class="num">{{ l.security_deposit_minor|money }}</td>
+    <td><span class="badge b-{{ st }}">{{ STATUS_LABELS[st] }}</span>{% if l.has_renewal_option %} <span class="badge b-info">opción renov.</span>{% endif %}</td>
+    <td>{% if l.contract_document_id %}<a href="/documents/{{ l.contract_document_id }}">PDF</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="10" class="empty">Sin contratos.</td></tr>{% endfor %}
+</table></div></section>
+{% endblock %}

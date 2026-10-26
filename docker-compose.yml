@@ -1,0 +1,52 @@
+# Control Platform C.M / Yosef Golan — single-host deployment
+#   cp .env.example .env   (fill secrets)   &&   docker compose up -d
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: control_platform
+      POSTGRES_USER: control
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U control -d control_platform"]
+      interval: 10s
+    # no published port: the database is reachable only from the internal network
+
+  app:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CP_DATABASE_URL: postgresql+psycopg://control:${POSTGRES_PASSWORD}@db:5432/control_platform
+      CP_STORAGE_DIR: /data/uploads
+    volumes: [uploads:/data/uploads]
+    depends_on: { db: { condition: service_healthy } }
+
+  scheduler:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CP_DATABASE_URL: postgresql+psycopg://control:${POSTGRES_PASSWORD}@db:5432/control_platform
+    command: ["python", "-m", "app.scheduler"]
+    depends_on: { app: { condition: service_healthy } }
+
+  caddy:   # TLS termination (automatic Let's Encrypt, or internal CA for LAN-only use)
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment: { CP_DOMAIN: "${CP_DOMAIN:-localhost}" }
+    volumes: ["./deploy/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data"]
+    depends_on: [app]
+
+  backup:  # nightly DB dump + uploads archive, 30-day retention. Encrypt and sync ./backups off-site (docs/ARCHITECTURE.md §1.5)
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment: { PGPASSWORD: "${POSTGRES_PASSWORD}" }
+    volumes: ["./backups:/backups", "uploads:/data/uploads:ro"]
+    entrypoint: ["sh", "-c", "while true; do d=$$(date +%F); pg_dump -h db -U control -Fc control_platform > /backups/db_$$d.dump && tar czf /backups/uploads_$$d.tgz -C /data uploads; find /backups -mtime +30 -delete; sleep 86400; done"]
+    depends_on: { db: { condition: service_healthy } }
+
+volumes: { pgdata: {}, uploads: {}, caddy_data: {} }

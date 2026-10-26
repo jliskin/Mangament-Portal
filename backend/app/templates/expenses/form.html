@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Registrar gasto{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Registrar gasto</h1><a class="btn" href="/expenses">← Gastos</a></div>
+<form method="post" action="/expenses" enctype="multipart/form-data" class="card stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="row">
+    <div><label for="d">Fecha</label><input id="d" type="date" name="expense_date" value="{{ today.isoformat() }}" required></div>
+    <div><label for="a">Importe ({{ currency }})</label><input id="a" name="amount" inputmode="decimal" required></div>
+    <div><label for="c">Categoría</label><select id="c" name="category_id" required>{% for c in categories %}<option value="{{ c.id }}">{{ c.name }}{{ ' (no afecta NOI)' if c.is_capex }}</option>{% endfor %}</select></div>
+    <div><label for="u">Asignar a</label><select id="u" name="unit_id"><option value="">Edificio / áreas comunes</option>{% for u in units %}<option value="{{ u.id }}">Unidad {{ u.unit_number }}</option>{% endfor %}</select>
+      <div class="hint">Los gastos comunes se prorratean por m² en el P&amp;L por unidad.</div></div>
+  </div>
+  <label for="ds">Descripción</label><input id="ds" name="description" required>
+  <div class="row">
+    <div><label for="v">Proveedor</label><select id="v" name="vendor_id"><option value="">—</option>{% for v in vendors %}<option value="{{ v.id }}">{{ v.name }}</option>{% endfor %}</select></div>
+    <div><label for="nv">…o nuevo proveedor</label><input id="nv" name="new_vendor"></div>
+    <div><label for="r">Comprobante (PDF / foto)</label><input id="r" type="file" name="receipt" accept=".pdf,.png,.jpg,.jpeg"></div>
+  </div>
+  <p><button class="btn primary">Guardar gasto</button></p>
+</form>
+{% endblock %}

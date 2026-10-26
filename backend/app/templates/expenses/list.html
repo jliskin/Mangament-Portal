@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Gastos{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Gastos operativos</h1><div class="muted">Total del período: <strong>{{ total|money }} {{ currency }}</strong></div></div>
+  <div class="actions">
+    <form method="get" action="/expenses" class="actions">
+      <input type="month" name="month" value="{{ month }}" aria-label="Mes">
+      <select name="category_id" aria-label="Categoría"><option value="">Todas las categorías</option>{% for c in categories %}<option value="{{ c.id }}" {{ 'selected' if category_id == c.id }}>{{ c.name }}</option>{% endfor %}</select>
+      <button class="btn">Filtrar</button>
+    </form>
+    {% if user.role != 'viewer' %}<a class="btn primary" href="/expenses/new">+ Registrar gasto</a>{% endif %}
+  </div>
+</div>
+<div class="grid g3">
+  <section class="card">
+    <h2>Por categoría</h2>
+    <table>{% for name, amt in by_cat %}<tr><td>{{ name }}</td><td class="num">{{ amt|money }}</td></tr>{% else %}<tr><td class="muted">Sin gastos.</td></tr>{% endfor %}</table>
+  </section>
+</div>
+<section class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Proveedor</th><th>Asignado a</th><th class="num">Importe</th><th>Comprobante</th><th></th></tr></thead>
+  {% for e in rows %}
+  <tr>
+    <td>{{ e.expense_date|date }}</td>
+    <td>{{ e.category.name }}{% if e.category.is_capex %} <span class="badge b-info">CapEx</span>{% endif %}</td>
+    <td>{{ e.description }}{% if e.bank_transaction_id %} <span class="badge b-info">extracto</span>{% endif %}</td>
+    <td>{{ e.vendor.name if e.vendor }}</td>
+    <td>{{ 'Unidad ' ~ e.unit.unit_number if e.unit else 'Edificio' }}</td>
+    <td class="num">{{ e.amount_minor|money }}</td>
+    <td>{% if e.receipt %}<a href="/documents/{{ e.receipt.id }}">ver</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td>{% if user.role != 'viewer' and not e.bank_transaction_id %}<form method="post" action="/expenses/{{ e.id }}/delete" class="inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn sm danger">Eliminar</button></form>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="8" class="empty">Sin gastos en el período.</td></tr>{% endfor %}
+</table></div></section>
+{% endblock %}
