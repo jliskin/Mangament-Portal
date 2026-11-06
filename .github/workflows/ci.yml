@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine   # same major version as docker-compose.yml
+        env:
+          POSTGRES_USER: control
+          POSTGRES_PASSWORD: control
+          POSTGRES_DB: cp_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U control -d cp_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      # Without this, the integration and web tests (about half the suite) skip silently.
+      CP_TEST_DATABASE_URL: postgresql+psycopg://control:control@localhost:5432/cp_test
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"   # matches backend/Dockerfile
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest -q -rs --junitxml=pytest-report.xml
+
+      - name: Fail if any test was skipped
+        # A skip here means the database tests did not run, so a green build would be misleading.
+        run: |
+          python - <<'EOF'
+          import sys
+          import xml.etree.ElementTree as ET
+          root = ET.parse("pytest-report.xml").getroot()
+          suites = [root] if root.tag == "testsuite" else root.findall("testsuite")
+          skipped = sum(int(s.get("skipped", 0)) for s in suites)
+          total = sum(int(s.get("tests", 0)) for s in suites)
+          print(f"{total} tests, {skipped} skipped")
+          sys.exit(1 if skipped else 0)
+          EOF
